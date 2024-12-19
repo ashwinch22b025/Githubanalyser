@@ -1,80 +1,92 @@
+from bs4 import BeautifulSoup
 import requests
-import openai
+import pandas as pd
 import streamlit as st
 
-# Load OpenAI API key from Streamlit secrets
-openai.api_key = st.secrets['OPENAI_API_KEY']
+def getData(userName):
+    url = "https://github.com/{}?tab=repositories".format(userName)
+    page = requests.get(url)
+    soup = BeautifulSoup(page.content , 'html.parser')
+    info = {}
 
-# Function to fetch a GitHub user's repositories
-def fetch_user_repos(username):
-    url = f'https://api.github.com/users/{username}/repos'
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"Failed to fetch user repositories. Status code: {response.status_code}")
+    # Scraping Profile Info
 
-# Function to assess repository complexity using GPT and LangChain
-async def assess_repository(repo):
-    repo_name = repo['name']
-    repo_url = repo['html_url']
-    readme_url = f"{repo_url}/blob/master/README.md"
-
-    readme_response = requests.get(readme_url)
-    readme_content = ''
-    if readme_response.status_code == 200:
-        readme_content = readme_response.text
-
-    gpt_input = f"Assess the complexity of repository {repo_name}. {readme_content}"
-    client = openai.AsyncOpenAI()  # Initialize async OpenAI client
-    gpt_response = await client.chat.completions.create(
-        model="gpt-3.5-turbo",  # or "text-davinci-003"
-        messages=[{"role": "user", "content": gpt_input}],
-        max_tokens=100,
-        temperature=0.5
-    )
-    complexity_score = gpt_response['choices'][0]['message']['content']
-
-    # Example placeholder for LangChain metrics
-    code_metrics = langchain.extract_metrics_from_github_repo(repo_url)
-    overall_score = complexity_score + code_metrics.complexity_score
-
-    return repo_name, repo_url, overall_score
-
-# Function to find the most technically challenging repository
-async def find_most_challenging_repository(username):
-    try:
-        repositories = fetch_user_repos(username)
-        if not repositories:
-            raise Exception(f"No repositories found for user {username}")
-
-        repository_scores = []
-        for repo in repositories:
-            repo_name, repo_url, overall_score = await assess_repository(repo)
-            repository_scores.append((repo_name, repo_url, overall_score))
-
-        repository_scores.sort(key=lambda x: x[2], reverse=True)
-        return repository_scores[0]
-
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-
-# Streamlit app
-async def app():
-    st.title("GitHub Repository Complexity Assessor")
+    #full Name
+    info['name'] = soup.find(class_ = 'vcard-fullname').get_text()
+    #image
+    info['image_url'] =  soup.find(class_ = 'avatar-user')['src']
+    #followers and follwoing
+    info['followers'] = soup.select_one("a[href*=followers]").get_text().strip().split('\n')[0]
+    info['following'] = soup.select_one("a[href*=following]").get_text().strip().split('\n')[0]
     
-    username = st.text_input("Enter GitHub Username:")
-    if username:
-        st.write(f"Fetching repositories for user: {username}...")
-        most_challenging_repo = await find_most_challenging_repository(username)
-        if most_challenging_repo:
-            st.success(f"The most challenging repository for user {username} is:")
-            st.write(f"Name: {most_challenging_repo[0]}")
-            st.write(f"URL: {most_challenging_repo[1]}")
-        else:
-            st.write(f"No challenging repositories found for user {username}.")
+    #location
+    try:
+        info['location'] = soup.select_one('li[itemprop*=home]').get_text().strip()
+    except:
+        info['location'] = ''
+    #url
+    try:
+        info['url'] = soup.select_one('li[itemprop*=url]').get_text().strip()
+    except:
+        info['url'] = ''
+    
+    #get Repositories as a dataframe
+    repos = soup.find_all(class_ = 'source')
+    repo_info = []
+    for repo in repos:
 
-# Run the Streamlit app
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(app())  # Use asyncio.run for running asynchronous Streamlit app
+        #repo name and link
+        try:
+            name = repo.select_one('a[itemprop*=codeRepository]').get_text().strip()
+            link = 'https://github.com/{}/{}'.format(userName,name)
+        except:
+            name = ''
+            link = ''
+        
+        #repo update time
+        try:
+            updated = repo.find('relative-time').get_text()
+        except:
+            updated = ''
+        
+        # programming language
+        try:
+            language = repo.select_one('span[itemprop*=programmingLanguage]').get_text()
+        except:
+            language = ''
+        
+        # description
+        try:
+            description = repo.select_one('p[itemprop*=description]').get_text().strip()
+        except:
+            description = ''
+        
+        repo_info.append({'name': name ,
+        'link': link , 
+        'updated ':updated , 
+        'language': language , 
+        'description':description})
+    repo_info = pd.DataFrame(repo_info)
+    return info , repo_info
+st.title("Github Scraper")
+
+userName = st.text_input('Enter Github Username')
+
+if userName != '':
+    try:
+        info, repo_info = getData(userName)
+
+        for key , value in info.items():
+            if key != 'image_url':
+                st.subheader(
+                    '''
+                    {} : {} 
+                    '''.format(key, value)
+                )
+            else:
+                st.image(value)
+        st.subheader(" Recent Repositories")
+        st.table(repo_info)
+    except:
+        st.subheader("User doesn't exist")
+
