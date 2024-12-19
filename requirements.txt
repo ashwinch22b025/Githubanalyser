@@ -1,10 +1,4 @@
-Pandas
-Numpy
-seaborn
-langchain
-openai==1.0.0
--e .
-streamlit
 requests
-python-dotenv
+streamlit
 beautifulsoup4
+pandas
