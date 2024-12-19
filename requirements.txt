@@ -2,7 +2,7 @@ Pandas
 Numpy
 seaborn
 langchain
-openai==0.28
+openai==1.0.0
 -e .
 streamlit
 requests
