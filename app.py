@@ -15,7 +15,7 @@ def fetch_user_repos(username):
         raise Exception(f"Failed to fetch user repositories. Status code: {response.status_code}")
 
 # Function to assess repository complexity using GPT and LangChain
-def assess_repository(repo):
+async def assess_repository(repo):
     repo_name = repo['name']
     repo_url = repo['html_url']
     readme_url = f"{repo_url}/blob/master/README.md"
@@ -26,16 +26,14 @@ def assess_repository(repo):
         readme_content = readme_response.text
 
     gpt_input = f"Assess the complexity of repository {repo_name}. {readme_content}"
-    gpt_response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # or text-davinci-003 as needed
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": gpt_input}
-        ],
+    client = openai.AsyncOpenAI()  # Initialize async OpenAI client
+    gpt_response = await client.chat.completions.create(
+        model="gpt-3.5-turbo",  # or "text-davinci-003"
+        messages=[{"role": "user", "content": gpt_input}],
         max_tokens=100,
         temperature=0.5
     )
-    complexity_score = gpt_response.choices[0].message['content']  # Assuming the response format has 'content' key for the result
+    complexity_score = gpt_response['choices'][0]['message']['content']
 
     # Example placeholder for LangChain metrics
     code_metrics = langchain.extract_metrics_from_github_repo(repo_url)
@@ -44,7 +42,7 @@ def assess_repository(repo):
     return repo_name, repo_url, overall_score
 
 # Function to find the most technically challenging repository
-def find_most_challenging_repository(username):
+async def find_most_challenging_repository(username):
     try:
         repositories = fetch_user_repos(username)
         if not repositories:
@@ -52,7 +50,7 @@ def find_most_challenging_repository(username):
 
         repository_scores = []
         for repo in repositories:
-            repo_name, repo_url, overall_score = assess_repository(repo)
+            repo_name, repo_url, overall_score = await assess_repository(repo)
             repository_scores.append((repo_name, repo_url, overall_score))
 
         repository_scores.sort(key=lambda x: x[2], reverse=True)
@@ -62,13 +60,13 @@ def find_most_challenging_repository(username):
         st.error(f"An error occurred: {str(e)}")
 
 # Streamlit app
-def app():
+async def app():
     st.title("GitHub Repository Complexity Assessor")
     
     username = st.text_input("Enter GitHub Username:")
     if username:
         st.write(f"Fetching repositories for user: {username}...")
-        most_challenging_repo = find_most_challenging_repository(username)
+        most_challenging_repo = await find_most_challenging_repository(username)
         if most_challenging_repo:
             st.success(f"The most challenging repository for user {username} is:")
             st.write(f"Name: {most_challenging_repo[0]}")
@@ -78,5 +76,5 @@ def app():
 
 # Run the Streamlit app
 if __name__ == "__main__":
-    app()
-
+    import asyncio
+    asyncio.run(app())  # Use asyncio.run for running asynchronous Streamlit app
