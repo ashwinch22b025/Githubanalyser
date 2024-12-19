@@ -1,14 +1,9 @@
 import requests
 import openai
 import streamlit as st
-from dotenv import load_dotenv
-import os
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Set up OpenAI GPT API credentials from .env
-openai.api_key = os.getenv('OPENAI_API_KEY')
+# Load OpenAI API key from Streamlit secrets
+openai.api_key = st.secrets['OPENAI_API_KEY']
 
 # Function to fetch a GitHub user's repositories
 def fetch_user_repos(username):
