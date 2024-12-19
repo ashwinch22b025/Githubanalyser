@@ -6,3 +6,4 @@ openai
 -e .
 streamlit
 requests
+python-dotenv
