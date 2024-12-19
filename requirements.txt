@@ -1,10 +1,8 @@
-streamlit
-pandas
-numpy
+Pandas
+Numpy
 seaborn
 langchain
 openai
-google-generativeai
-langchain-google-genai
+-e .
+streamlit
 requests
-python-dotenv
