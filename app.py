@@ -26,13 +26,16 @@ def assess_repository(repo):
         readme_content = readme_response.text
 
     gpt_input = f"Assess the complexity of repository {repo_name}. {readme_content}"
-    gpt_response = openai.Completion.create(
-        engine='text-davinci-003',
-        prompt=gpt_input,
+    gpt_response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",  # or text-davinci-003 as needed
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": gpt_input}
+        ],
         max_tokens=100,
         temperature=0.5
     )
-    complexity_score = gpt_response.choices[0].score
+    complexity_score = gpt_response.choices[0].message['content']  # Assuming the response format has 'content' key for the result
 
     # Example placeholder for LangChain metrics
     code_metrics = langchain.extract_metrics_from_github_repo(repo_url)
@@ -76,3 +79,4 @@ def app():
 # Run the Streamlit app
 if __name__ == "__main__":
     app()
+
